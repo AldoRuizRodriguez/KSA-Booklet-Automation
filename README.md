@@ -24,9 +24,9 @@ The modules needed are:
 * selenium
 * time
 
-##Files
+## Files
 
-Weekly Reports: This Script made in python the Downloads and give the correct format to the reports
-Monthly Reports: This Script made in python the Downloads of each report(to the present day the formatting to this reports is in progress)
-List of Reports: This file shows the Status of each report, giving information if the one Specific report has passed correctly the process to be downloaded, if has been any issues with the Automatic Download or presents some problems at the time of giving format.
+* Weekly Reports: This Script made in python the Downloads and give the correct format to the reports
+* Monthly Reports: This Script made in python the Downloads of each report(to the present day the formatting to this reports is in progress)
+* List of Reports: This file shows the Status of each report, giving information if the one Specific report has passed correctly the process to be downloaded, if has been any issues with the Automatic Download or presents some problems at the time of giving format.
 
