@@ -25,7 +25,7 @@ next_button=driver.find_element_by_id('idp-discovery-submit').click()
 
 #The program waits until the the Authentication progress is done and the Spotfire webpage is loaded
 WebDriverWait(driver, 100).until(EC.presence_of_element_located((By.XPATH, '/html/body/div/div[2]/div/div[5]/div[2]/div[1]/div')))
-
+time.sleep(3)
 #Clicks the 'Mapped devices' button report
 mapped_dev_button=driver.find_element_by_xpath('/html/body/div/div[2]/div/div[1]/div/div/div[1]/div/div/div[2]/div[1]/div[1]/div[32]')
 driver.execute_script("arguments[0].click();", mapped_dev_button)
