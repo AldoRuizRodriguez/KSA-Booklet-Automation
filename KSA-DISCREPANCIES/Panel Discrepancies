@@ -20,7 +20,7 @@ sp['Unit ID'] = sp['site'].astype(str) +"-"+ sp['hh_id'].astype(str)
 data1 = data.merge(sp[['Unit ID','Mapped','reason']], on = 'Unit ID', how = 'left')
 #data2 = data1.merge(sp[['Unit ID','reason']], on = 'Unit ID', how = 'left')
 
-conditions = [data1['Mapped'].eq('No') & data1['reason'].eq(''),
+conditions = [data1['Mapped'].eq('No') & (data1['reason'].isnull()),
               data1['Mapped'].eq('No') & (data1['reason'] != ''),
               data1['Mapped'].eq('Yes'),
               data1['Mapped'].isnull()]
