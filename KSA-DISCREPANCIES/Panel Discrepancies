@@ -1,0 +1,118 @@
+import pandas as pd
+import time
+import numpy as np
+import datetime
+from datetime import date
+from datetime import datetime
+
+data = pd.read_csv(r'C:\Users\edsantil2101\Downloads\Data analyser.csv')
+sp = pd.read_csv(r'C:\Users\edsantil2101\Downloads\Spotfire_ Mapped devices.csv')
+ad = pd.read_csv(r'C:\Users\edsantil2101\Downloads\Adhoc_ Panel_discrepanices.csv')
+ss = pd.read_csv(r'C:\Users\edsantil2101\Downloads\Sub-sample.csv')
+
+date_today = datetime.now().strftime("%Y%m%d")
+
+#ADDING ALL EXTRA COLUMNS ACROSS THE THREE TABLES
+data['Unit ID'] = data['Ext Meter No'].astype(str) +"-"+ data['Household No'].astype(str)
+data['Connected device ID'] = data['Household No'].astype(str) +"-"+ data['Ext Meter No'].astype(str) +"0"
+sp['Mapped'] = np.where(sp['odid'].isnull(), 'No', 'Yes')
+sp['Unit ID'] = sp['site'].astype(str) +"-"+ sp['hh_id'].astype(str)
+data1 = data.merge(sp[['Unit ID','Mapped','reason']], on = 'Unit ID', how = 'left')
+#data2 = data1.merge(sp[['Unit ID','reason']], on = 'Unit ID', how = 'left')
+
+conditions = [data1['Mapped'].eq('No') & (data1['reason'].isnull()),
+              data1['Mapped'].eq('No') & (data1['reason'] != ''),
+              data1['Mapped'].eq('Yes'),
+              data1['Mapped'].isnull()]
+
+choices = [1,0,'',np.nan]
+
+data1['Mapping Status'] = np.select(conditions, choices, default=0)
+data1['Nano installed'] = np.where(data1['Meter Serial']!= '', True, False)
+
+ad.rename(columns = {'fam.familycode':'Household No'}, inplace = True)
+data2 = data1.merge(ad[['Household No','fam.status']], on = 'Household No', how = 'left')
+ad1 = ad.merge(data[['Household No','DMX Installed']], on = 'Household No', how = 'left')
+ad1['DMX Installed'].fillna('FALSE',inplace = True)
+ad1.rename(columns = {'Household No':'hh_id'}, inplace = True)
+sp1 = sp.merge(ad1[['hh_id','fam.status']], on = 'hh_id', how = 'left')
+sp1['Device type'] = np.where(sp1['site'] < 9, 'Connected', 'Digital')
+ss.rename(columns = {'hh':'hh_id', 'Reason':'Sub-sample'}, inplace = True)
+ad1.rename(columns = {'hh_id':'fam.familycode'}, inplace = True)
+ad1['Unit ID'] = ad1['unit.unitid'].astype(str) +"-"+ ad1['fam.familycode'].astype(str)
+data3 = data2.merge(ad1[['Unit ID','unit.status']], on = 'Unit ID', how = 'left')
+
+sp2 = sp1.merge(ad1[['Unit ID','unit.status','unit.secstatus']], on = 'Unit ID', how = 'left')
+sp3 = sp2.merge(ss, on = 'hh_id', how = 'left')
+
+ad1['Device type'] = np.where(ad1['unit.unitid'] < 9, 'Connected', 'Digital')
+ad2 = ad1.merge(sp[['Unit ID','Mapped','reason']], on = 'Unit ID', how = 'left')
+ad2['Mapped'].fillna('No',inplace = True)
+#ad3 = ad2.merge(sp[['Unit ID','reason']], on = 'Unit ID', how = 'left')
+ad2['reason'].fillna('',inplace = True)
+ad3 = ad2.merge(data1[['Unit ID','Nano installed']], on = 'Unit ID', how = 'left')
+ad3['Nano installed'].fillna('False',inplace = True)
+ss.rename(columns = {'hh_id':'fam.familycode'}, inplace = True)
+ad4 = ad3.merge(ss, on = 'fam.familycode', how = 'left')
+
+data4 = data3.drop_duplicates()
+sp35 = sp3.drop_duplicates()
+ad45 = ad4.drop_duplicates()
+
+#MAKING THE PIVOT TABLES
+one = pd.pivot_table(ad4,values=['fam.familycode'],index=['fam.status'],aggfunc=pd.Series.nunique,margins=True, observed=True) #FIRST
+ad5 = ad4.drop_duplicates(subset=['fam.familycode'])
+two = pd.pivot_table(ad5,values=['fam.familycode'],index=['Type of Broadband in HH'], columns=['DMX Installed'],aggfunc=np.count_nonzero,margins=True) #Second
+three = pd.pivot_table(ad5,values=['fam.familycode'],index=['Type of Broadband in HH'], columns=['FIXED INTERNET Internet Connection'],aggfunc=np.count_nonzero,margins=True) #Third
+four = pd.pivot_table(ad5,values=['fam.familycode'],index=['Type of Broadband in HH'], columns=['MOBILE INTERNET 3G, 4G, 5G Internet Connection'],aggfunc=np.count_nonzero,margins=True) #Fourth
+make_list = ['Amazon Fire stick','Android Box','Apple TV','Chrome cast','Computer on TV','IPTV BE OUT/OSN','IPTV Channels only','IPTV GOBX service','IPTV JAWWY','IPTV Video on Demand','IPTV with VOD and Channels','IPTV:BeIN','Other Games','Playstation','Smart TV','XBOX']
+#sp4['Unit ID'] = sp4['Unit ID'].astype(str)
+sp4 = sp3.drop_duplicates(subset=['Unit ID'])
+filter1 = ((sp4['fam.status'] != np.nan) & (sp4['make'].isin(make_list)) & (sp4['Device type'] == 'Connected'))
+#filter1 = ((sp4['fam.status'] != np.nan) & (sp4['make'].isin(make_list)) & (sp4['Device type'] == 'Connected'))
+five = pd.pivot_table(sp4.loc[filter1],values=['Unit ID'],index=['make'], columns=['Mapped'],aggfunc=np.count_nonzero,margins=True) #FIFTH
+filter2 = ((sp4['fam.status'] != np.nan) & (sp4['make'].isin(make_list)) & (sp4['Device type'] == 'Connected') & (sp4['Mapped'] == 'No'))
+six = pd.pivot_table(sp4.loc[filter2],values=['Unit ID'],index=['make'], columns=['reason'],aggfunc=pd.Series.nunique,margins=True) #SIXTH
+status_list = ['5-PC/Laptop Installed','6-Tablet Installed','7-Smartphone Installed','8-Digital Device Not Installed']
+filter3 = ((ad4['fam.status'] != np.nan) & (ad4['unit.status'].isin(status_list)) & (ad4['Mapped'] != np.nan))
+seven = pd.pivot_table(ad4.loc[filter3],values=['Unit ID'],index=['unit.status'], columns=['Mapped'],aggfunc=pd.Series.nunique,margins=True) #SEVENTH
+status_list2 = ['5-PC/Laptop Installed','6-Tablet Installed','7-Smartphone Installed']
+filter4 = ((ad4['fam.status'] == '130- To be Polled and Produced') & (ad4['unit.status'].isin(status_list2)) & (ad4['Mapped'] == 'No'))
+eight = pd.pivot_table(ad4.loc[filter4],values=['Unit ID'],index=['unit.secstatus'], aggfunc=pd.Series.nunique,margins=True) #EIGTH
+filter5 = ((ad4['fam.status'] == '130- To be Polled and Produced') & (ad4['unit.status'] == '8-Digital Device Not Installed') & (ad4['Mapped'] == 'Yes'))
+nine = pd.pivot_table(ad4.loc[filter5],values=['Unit ID'],index=['unit.status'], aggfunc=pd.Series.nunique,margins=True) #NINTH
+status_list3 = ['0-Monitored','1-Temporarily unmonitored','2-In existance but not be monitored','3-No longer used']
+filter6 = ((ad4['fam.status'] != np.nan ) & (ad4['unit.status'].isin(status_list3)))
+ten = pd.pivot_table(ad4.loc[filter6],values=['Unit ID'],index=['unit.status'],columns = ['Nano installed'], aggfunc=pd.Series.nunique,margins=True) #TENTH
+status_list4 = ['1-Temporarily unmonitored','2-In existance but not be monitored','3-No longer used']
+filter7 = ((ad4['fam.status'] != np.nan) & (ad4['unit.status'].isin(status_list4)) & (ad4['Nano installed'] == 'False'))
+eleven = pd.pivot_table(ad4.loc[filter7],values=['Unit ID'],index=['unit.secstatus'], aggfunc=pd.Series.nunique,margins=True) #ELEVENTH
+data3['unit.status'].fillna('NaN',inplace = True)
+filter8 = ((data3['unit.status'] == 'NaN' ) & (data3['fam.status'] == '130- To be Polled and Produced') & (data3['Nano installed'] == True))
+twelve = pd.pivot_table(data3.loc[filter8],values=['Unit ID'],index=['unit.status'],aggfunc=pd.Series.nunique,margins=True) #TWELVETH
+sp4['unit.status'].fillna('NaN',inplace = True)
+filter9 = ((sp4['unit.status'] == 'NaN' ) & (sp4['fam.status'] == '130- To be Polled and Produced') & (sp4['Device type'] == 'Digital'))
+thirteen = pd.pivot_table(sp4.loc[filter9],values=['Unit ID'],index=['unit.status'],aggfunc='count',margins=True) #THIRTENTH
+
+writer = pd.ExcelWriter(f'{path_out}/{date_today}_Discrepancies.xlsx')  #path + output_file_name, index = False
+data4.to_excel(writer,'Data Analyzer')
+sp35.to_excel(writer,'Spotfire Mapped Devices')
+ad4.to_excel(writer,'Adhoc Discrepancies')
+one.to_excel(writer,'HH Count')
+two.to_excel(writer, 'SM installed')
+# df_temp_out6.to_excel(writer, 'Output6')
+three.to_excel(writer, 'Fixed broadband')
+four.to_excel(writer, 'Mobile broadband')
+five.to_excel(writer, 'Mapping connected devices')
+#df_check10.to_excel(writer, 'Output10')
+six.to_excel(writer, 'Missing connected devices')
+seven.to_excel(writer, 'Mapping digital devices')
+eight.to_excel(writer, 'Missing digital devices')
+nine.to_excel(writer, 'Mapped 800 status devices')
+ten.to_excel(writer, 'NANO installed')
+eleven.to_excel(writer, 'Unmonitored TV-set')
+twelve.to_excel(writer, 'Missing in HHM NANO')
+thirteen.to_excel(writer, 'Missing in HHM Devices')
+writer.save()
+
+
